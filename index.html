@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no' />
+  <title>Iowa City Multilingual and Multicultural Community Support</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.6.0/leaflet.css" />
+  <!--for icon support-->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.14.0/css/all.css">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.14.0/css/v4-shims.css">
+  <!-- for icon markers -->
+  <link rel="stylesheet" href="css/leaflet.extra-markers.min.css">
+  <!-- for the marker clusters -->
+  <link rel="stylesheet" href="css/MarkerCluster.Default.css" />
+  <link rel="stylesheet" href="css/MarkerCluster.css" />
+
+  <!-- Leaflet JavaScript -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.6.0/leaflet.js"></script>
+  <!--d3-fetch parsing module for requesting files into web application-->
+  <script src="https://d3js.org/d3-fetch.v1.min.js"></script>
+  <!-- jquery -->
+  <script src="https://code.jquery.com/jquery-3.2.0.min.js"></script>
+  <!-- for icon markers -->
+  <script src="js/leaflet.extra-markers.min.js"></script>
+  <!-- for grouped layer control -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-groupedlayercontrol/0.6.1/leaflet.groupedlayercontrol.min.js"></script>
+  <!-- root script for the marker clusters -->
+  <script src="js/leaflet.markercluster-src.js"></script>
+  <!-- for the layer control marker clusters -->
+  <script src="js/leaflet.markercluster.layersupport.js"></script>
+
+  <!-- CSS -->
+  <style>
+    /* Page Body */
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    /* Map */
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <!-- The map div -->
+  <div id="map"></div>
+  <script>
+    /* **** Leaflet JavaScript Below **** */
+    // Map
+    const map = L.map('map', {
+      center: [41.66, -91.53],
+      zoom: 13,
+      minZoom: 10,
+      maxZoom: 17,
+      //layers: [osm]
+    });
+
+    // Add a scale bar
+    L.control.scale({
+      position: 'bottomright' // Position the scale bar at the bottom-right corner
+    }).addTo(map);
+
+    // define the clustered layer support
+    var mcgLayerSupportGroup = L.markerClusterGroup.layerSupport(),
+      //  .. CartoDB Positron Base Layer
+      cartodb = L.tileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="http://cartodb.com/attributions">CartoDB</a>',
+        zoom: 13,
+        minZoom: 10,
+        maxZoom: 17
+      }),
+
+      // OpenStreetMap Base Layer
+      osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        zoom: 13,
+        minZoom: 10,
+        maxZoom: 17,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }),
+
+      // Define empty layer groups to store filtered content
+      african = L.layerGroup(),
+      africanAmerican = L.layerGroup(),
+      asianPacific = L.layerGroup(),
+      international = L.layerGroup(),
+      latinAmerican = L.layerGroup(),
+      nativeAmerican = L.layerGroup(),
+      // Define the layers for the layer control
+      groupedBases = {
+        "Carto Light Map": cartodb,
+        "OpenStreetMap": osm
+      },
+      groupedOverlays = {
+        "<b>Type of Community Support</b>": {
+          "African": african,
+          "African American": africanAmerican,
+          "Asian, Pacific Islander": asianPacific,
+          "International": international,
+          "Latin American": latinAmerican,
+          "Native American": nativeAmerican
+        },
+      },
+      // define the layer control and add the overlays
+      control = L.control.groupedLayers(groupedBases, groupedOverlays, {
+        collapsed: false,
+      }),
+      i, a, title, marker;
+      // add the clustered layer support to the map
+      mcgLayerSupportGroup.addTo(map);
+      // check in the layer groups you want to cluster
+      mcgLayerSupportGroup.checkIn([african, africanAmerican, asianPacific, international, latinAmerican, nativeAmerican]);
+      // add the cluster layer control to the map
+      control.addTo(map);
+
+    // Add the layers to the map
+    cartodb.addTo(map);
+    african.addTo(map);
+    africanAmerican.addTo(map);
+    asianPacific.addTo(map);
+    international.addTo(map);
+    latinAmerican.addTo(map);
+    nativeAmerican.addTo(map);
+
+    // Add a function to style the markers by filter type
+    function getColor(d) {
+      return d === "African" ? 'purple' :
+        d === "African American" ? 'blue' :
+        d === "Asian & Pacific Islander" ? 'red' :
+        d === "International" ? 'orange' :
+        d === "Latin American" ? 'cyan' :
+        d === "Native American" ? 'violet' :
+        'brown';
+    };
+
+    // Use D3 fetch to request data with async request
+    const allData = d3.json('data/multilingual.geojson');
+
+    // Use Promise to wait until data is all loaded
+    Promise.all([allData]).then(drawMap);
+
+    // function is called when Promise is fulfilled and data is ready
+    function drawMap(data) {
+      // pull out separate data arrays and assign to variables
+      const allSupport = data[0];
+
+      // create a layerGroup with the geojson data
+      const supportPoints = L.geoJson(allSupport, {
+        // make a layer from points
+        pointToLayer: function(feature, ll) {
+          // return a marker
+          return L.marker(ll, {
+            icon: L.ExtraMarkers.icon({
+              icon: 'fas fa-hands-helping',
+              prefix: 'fas',
+              markerColor: getColor(feature.properties.Filter),
+              iconColor: 'white'
+            })
+          })
+
+        }, //end pointToLayer
+
+        // On each marker...
+        onEachFeature: function(feature, layer) {
+
+          // define the layer feature properties
+          const props = layer.feature.properties;
+
+          const name = props.Name;
+          const address = props.Address;
+          const link = props.Website;
+          const filter = props.Filter;
+          const description = props.Description;
+
+          // bind info to the layer features using popups
+          layer.bindPopup("<h4 class=txt-bold>" + name + "<br>" + address + "</h4><hr><h5>" + description + "<br><a href='" + link + "' target='_blank'>Take me to the homepage.</a>" + "</h5>", {
+            closeButton: true
+          });
+          layer.on('mouseover', function() { // On mouseover...
+            layer.openPopup(); // open the popup
+          });
+
+          // filter content and add to empty layer groups
+          if (filter == "African") {
+            african.addLayer(layer);
+          }
+          if (filter == "African American") {
+            africanAmerican.addLayer(layer);
+          }
+          if (filter == "Asian & Pacific Islander") {
+            asianPacific.addLayer(layer);
+          }
+          if (filter == "International") {
+            international.addLayer(layer);
+          }
+          if (filter == "Latin American") {
+            latinAmerican.addLayer(layer);
+          }
+          if (filter == "Native American") {
+            nativeAmerican.addLayer(layer);
+          }
+
+        } // end onEachFeature
+
+      });
+    };
+
+  </script>
+</body>
